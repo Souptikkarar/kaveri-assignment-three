@@ -1,0 +1,16 @@
+# secrets
+.env
+*.env
+
+# python
+venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# os
+.DS_Store
+
+# outputs you don't want committed
+*.pdf
+!Assignment3_Submission.pdf
