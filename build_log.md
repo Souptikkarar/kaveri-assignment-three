@@ -24,3 +24,25 @@
 
 **Tomorrow:**
 workspace skeleton creation (Spaces/Folders/Lists, empty), custom fields define
+
+## Day 2 22.9.26
+**what i did**
+- Build the whole skeleton including the lists in workspace 
+- add all the necessary custom fields for the list 
+
+**blocked on**
+- nothing blocking 
+
+**tomorrow**
+- Populate master data + BOQ + approval matrix
+
+## Day 3 
+**what i did**
+- populated the master data,boq,approval etc
+
+**blocked on**
+- found out you need 2-4 code for full boq 
+- found out you canot link 2 relationship
+
+**tommorrow**
+- dashboard creation with automation
