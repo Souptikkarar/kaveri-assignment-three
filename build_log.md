@@ -36,13 +36,23 @@ workspace skeleton creation (Spaces/Folders/Lists, empty), custom fields define
 **tomorrow**
 - Populate master data + BOQ + approval matrix
 
-## Day 3 
+## Day 3 23.9.26
 **what i did**
 - populated the master data,boq,approval etc
 
 **blocked on**
 - found out you need 2-4 code for full boq 
-- found out you canot link 2 relationship
+- found out you cannot link 2 relationship
 
 **tommorrow**
 - dashboard creation with automation
+
+## day 4 24.9.26
+**What i did**
+- created the dashboard and worked on some automation 
+
+**Blocked on**
+- ClickUp's free plan does not include Chart or Calculation dashboard widgets (Unlimited plan+ required). Substituted Table view widgets showing the same underlying figures.
+
+**Tommorrow**
+- building the Schedule importer code 
