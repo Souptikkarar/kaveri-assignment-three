@@ -26,7 +26,7 @@
 workspace skeleton creation (Spaces/Folders/Lists, empty), custom fields define
 
 ## Day 2 22.9.26
-**what i did**
+**What i did**
 - Build the whole skeleton including the lists in workspace 
 - add all the necessary custom fields for the list 
 
@@ -37,7 +37,7 @@ workspace skeleton creation (Spaces/Folders/Lists, empty), custom fields define
 - Populate master data + BOQ + approval matrix
 
 ## Day 3 23.9.26
-**what i did**
+**What i did**
 - populated the master data,boq,approval etc
 
 **blocked on**
@@ -56,3 +56,53 @@ workspace skeleton creation (Spaces/Folders/Lists, empty), custom fields define
 
 **Tommorrow**
 - building the Schedule importer code 
+
+## day 5 25.9.26
+
+## Day 5 — [today's date]
+
+**What I did:**
+- Built and tested Program 1 (schedule_importer.py) — parsed SCP2_schedule.xer,
+  created 22 tasks (10 WBS groups + 12 activities) in ClickUp, verified every
+  duration/date/percent-complete value against the source XER by hand
+- Confirmed dependencies render correctly on the Gantt view, including P6 lag
+  preserved via task comments (ClickUp has no native FS/SS/lag field)
+- Discovered ClickUp's Free Plan hard-blocks Custom Fields entirely on this
+  workspace — not just the 60-use quota (which was hit first), but a full
+  plan-tier lock ("Custom Fields isn't available on your current plan")
+- Confirmed with Rajesh: staying on Free Plan, no upgrade
+- Redesigned the data model around this: everywhere a field was still needed
+  after the lock, moved it to a native ClickUp property (Status, Assignee,
+  Due Date, Description) or, where no native equivalent existed and the API
+  still needs structured data, encoded it into the task Name using a fixed
+  convention (e.g. "EX-901 - A3010 - B04 - 420m") parsed by code instead of
+  read via a custom field
+- Built and tested Program 2 (bill_engine.py) — computes RA-04 per §2/§3 of
+  the terms, verified the full arithmetic by hand against the data pack
+  before running it against ClickUp
+
+**Data/logic issues found today:**
+1. ClickUp Free Plan: Custom Fields blocked entirely, not just quota-limited
+   — required redesigning the field strategy for every list populated after
+   this point (§ referenced in README.md and schedule_importer.py header)
+2. Advance recovery cap: RA-04's flat 10%-of-gross recovery (₹3,88,350) would
+   exceed the outstanding advance balance (₹3,24,650) — recovery must be
+   capped at the balance, per §3.1. This wasn't in my original list of data
+   issues; found it while hand-verifying the bill arithmetic before coding it.
+3. [carry forward the 12 data-pack issues from Day 1, if not already logged
+   separately — EX-908 crew-cap overshoot, EX-917's nonexistent A3050 code,
+   B05's 250m contract-cap breach, PO-T-09's failed QC, PO-P-05's partial QC,
+   PO-T-09's 11.8% steel variance, PR-103/104/105/106/108 routing, unit
+   mixing on B04's log entries]
+
+**RA-04 computed result:**
+Gross ₹38,83,500 | GST ₹6,99,030 | Retention ₹1,94,175 | Advance recovery
+₹3,24,650 (capped) | Net payable ₹40,63,705
+
+**Blocked on / questions:**
+- [anything you're still unsure about — e.g. whether the Custom Field lock
+  is quota-based-and-permanent or plan-based-and-would-lift on any trial]
+
+**Tomorrow:**
+- [Day 6 plan — populate remaining ClickUp data, run bill_engine.py live,
+  generate the RA-04 PDF]

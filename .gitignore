@@ -14,3 +14,7 @@ __pycache__/
 # outputs you don't want committed
 *.pdf
 !Assignment3_Submission.pdf
+
+*.csv
+*.xer
+contract_and_policy_terms.md
