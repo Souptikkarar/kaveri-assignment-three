@@ -106,3 +106,58 @@ Gross ₹38,83,500 | GST ₹6,99,030 | Retention ₹1,94,175 | Advance recovery
 **Tomorrow:**
 - [Day 6 plan — populate remaining ClickUp data, run bill_engine.py live,
   generate the RA-04 PDF]
+
+## Day 6 — 26.9.26
+
+**What I did:**
+- Populated Measurement & Certification (3 rows: B04, B05, B06) and Production
+  Orders (5 rows: PO-T-07/08/09, PO-P-04/05) using the Name-encoding
+  convention, since Custom Fields remain locked on this workspace
+- Built and tested Program 2 (bill_engine.py) — reads BOQ via still-readable
+  custom fields, reads Measurement & Certification and Production Orders via
+  regex-parsed task Names, computes RA-04 per §2/§3
+- Ran it live against ClickUp: caught a real data-entry bug of my own
+  (B07's Rate custom field showed Rs.14,500 instead of the correct
+  Rs.4,50,000 — likely a Day 3 copy-paste slip from B06)
+- Since Custom Fields can't be edited to fix it, built a transparent
+  override mechanism: a CORRECTED_RATE tag in the task's Description
+  (a native, freely-editable field), parsed and applied by the script with
+  a printed warning — never a silent fix
+- Re-ran after the correction; verified every output value against my own
+  hand-calculated arithmetic from before any code was written
+
+**Result — RA-04 (work month September 2026):**
+- Gross value: Rs.38,83,500
+- GST (18%): Rs.6,99,030
+- Retention (5%): Rs.1,94,175
+- Advance recovery: Rs.3,24,650 (capped — 10% of gross would have been
+  Rs.3,88,350, which exceeds the outstanding advance balance; §3.1 caps
+  recovery at whatever remains)
+- **Net payable: Rs.40,63,705**
+- Exclusions applied and logged by the code (not by me manually removing
+  anything): PO-T-09's 300m QC-failed and excluded entirely from B02;
+  PO-P-05's 2 QC-failed poles excluded from B03; B04's 0.3km disputed
+  quantity carried forward, not billed; B05's certified 950m capped at
+  700m billable because the remaining 250m would exceed the 4000m
+  contract quantity — excess flagged as a variation claim
+- RA-04 task created in ClickUp's RA Bills list (Name + Description, no
+  custom fields needed for output)
+
+**Issues found today:**
+1. B07 Rate custom field entered incorrectly during Day 3 master-data
+   population (Rs.14,500 instead of Rs.4,50,000) — caught only because
+   the bill engine's contract-value calculation for advance recovery
+   depends on every BOQ item's rate being correct, even items not billed
+   this period
+2. Confirms the CustomField lock is permanent for this workspace, not a
+   temporary quota that resets — worked around via Description-based
+   override tags rather than waiting for it to change
+
+**Blocked on / questions:**
+- [any open question — e.g. whether to generate the bill as an actual PDF
+  next, or move on to Program 3 first]
+
+**Tomorrow:**
+- Program 3 (approval router) — logic already dry-run tested against all
+  9 purchase requests and confirmed correct before touching the live API
+  
