@@ -100,8 +100,7 @@ Gross ₹38,83,500 | GST ₹6,99,030 | Retention ₹1,94,175 | Advance recovery
 ₹3,24,650 (capped) | Net payable ₹40,63,705
 
 **Blocked on / questions:**
-- [anything you're still unsure about — e.g. whether the Custom Field lock
-  is quota-based-and-permanent or plan-based-and-would-lift on any trial]
+- nothing
 
 **Tomorrow:**
 - [Day 6 plan — populate remaining ClickUp data, run bill_engine.py live,
@@ -154,10 +153,60 @@ Gross ₹38,83,500 | GST ₹6,99,030 | Retention ₹1,94,175 | Advance recovery
    override tags rather than waiting for it to change
 
 **Blocked on / questions:**
-- [any open question — e.g. whether to generate the bill as an actual PDF
-  next, or move on to Program 3 first]
+- nothing
 
 **Tomorrow:**
 - Program 3 (approval router) — logic already dry-run tested against all
   9 purchase requests and confirmed correct before touching the live API
   
+## Day 7 — 27.9.26
+
+**What I did:**
+- Populated Purchase Requests (9 rows) using Name-encoding, since Custom
+  Fields remain locked on this workspace — no workaround needed here since
+  the program's actual required outputs (assign approver, write comment)
+  map onto ClickUp's native Assignee and Comment features, neither of
+  which is a custom field
+- Built and dry-run tested Program 3 (approval_router.py) against all 9
+  PRs before touching the live API — confirmed §6.1-6.3 logic correct by
+  hand (value-based routing, leave rerouting, same-day/vendor/requester
+  aggregation) before running anything against ClickUp
+- Chose polling over webhooks — no public endpoint on this machine, and PR
+  approval routing has no sub-second latency requirement
+- First live run gave 2 wrong results out of 9 (PR-104, PR-108 — both
+  stayed at L2 instead of rerouting to L3 for Neha Kulkarni's leave). No
+  error was thrown; the script ran clean and still gave wrong answers,
+  which only surfaced by comparing live output against the hand-verified
+  expected table, not from any crash
+- Root cause: custom field name lookup was case-sensitive
+  ("Leave To" in code vs. "Leave to" as actually typed in ClickUp) — a
+  silent mismatch that returned None instead of erroring, so the leave
+  check always evaluated false
+- Fixed with a case-insensitive field-name match; applied the same
+  defensive fix to bill_engine.py proactively, since it used the same
+  fragile exact-match pattern (it happened to work there by luck, not by
+  correctness)
+- Deleted the 9 stale "Routed to:" comments from the buggy run, re-ran —
+  all 9 PRs now match the hand-verified routing exactly, including both
+  leave-reroute cases
+
+**Issues found today:**
+1. Custom field name matching is case-sensitive by default in the ClickUp
+   API — a mismatch fails silently (returns None) rather than erroring,
+   which is a dangerous failure mode since nothing visibly breaks
+2. A brief DNS/connectivity failure (getaddrinfo error) interrupted one
+   run — unrelated to the code, resolved by confirming network access and
+   retrying
+3. Native Assignee can only be set for approvers who exist as real
+   ClickUp workspace members — this single-developer demo workspace only
+   has one real member, so all 9 PRs were "commented only," not assigned.
+   A production deployment would need all 4 approvers invited as members.
+
+**Confirmed correct routing (all 9):**
+PR-101, 102 -> L1 | PR-103, 109 -> L2 | PR-104 (leave reroute), 105, 106
+(aggregation), 108 (leave reroute) -> L3 | PR-107 -> L4
+
+**Blocked on / questions:**
+- nothing
+**Tomorrow:**
+- Program 4 (cash-flow forecaster)
