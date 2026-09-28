@@ -111,9 +111,13 @@ def get_all_tasks(list_id):
 def get_custom_field_value(task, field_name):
     """Read a value from a task's already-set custom fields (BOQ only —
     these fields predate the plan's Custom Field lock and remain readable
-    even though new ones can no longer be written)."""
+    even though new ones can no longer be written). Case-insensitive
+    match, since an exact-string mismatch (e.g. "Leave To" vs "Leave to")
+    fails silently and returns None rather than erroring — a real bug
+    this caused in approval_router.py, fixed here defensively too."""
+    target = field_name.strip().lower()
     for cf in task.get("custom_fields", []):
-        if cf["name"] == field_name:
+        if cf["name"].strip().lower() == target:
             return cf.get("value")
     return None
 
@@ -332,6 +336,76 @@ def compute_milestone(boq_item, cumulative_before, milestone_complete):
 # Main
 # ---------------------------------------------------------------------------
 
+def compute_bill(boq, mc_data, production_orders, cumulative_before, prior_bills,
+                  work_month=WORK_MONTH, milestone_completions=None):
+    """
+    Pure computation, no I/O — shared by bill_engine.py's own run() and by
+    cashflow_forecaster.py, so both always agree on the GST/retention/
+    advance-recovery formula instead of risking two copies drifting apart.
+
+    milestone_completions: optional {boq_code: bool} override for whether
+    a MILESTONE item's linked activity is complete this period. Defaults
+    to the bill_engine.py hardcoded B07-not-complete fact if not passed.
+
+    Returns a dict: {line_items, gross, gst, retention, advance_recovery,
+    outstanding_advance_after, net_payable}
+    """
+    if milestone_completions is None:
+        milestone_completions = {"B07": False}
+
+    boq_codes = sorted(boq.keys()) if boq else sorted(KNOWN_BILLING_BASIS.keys())
+    line_items = []
+    gross_total = 0.0
+
+    for code in boq_codes:
+        entry = boq.get(code, {})
+        rate = entry.get("rate")
+        contract_qty = entry.get("contract_qty")
+        basis = KNOWN_BILLING_BASIS.get(code)
+        if rate is None or contract_qty is None:
+            continue
+
+        cum_before = cumulative_before.get(code, 0.0)
+
+        if basis == "DELIVERY_QC":
+            billable, notes = compute_billable_delivery_qc(code, production_orders, cum_before, contract_qty)
+        elif basis == "PROGRESS":
+            billable, notes = compute_billable_progress(code, mc_data, cum_before, contract_qty)
+        elif basis == "MILESTONE":
+            milestone_complete = milestone_completions.get(code)
+            billable, notes = compute_milestone(code, cum_before, milestone_complete)
+        else:
+            continue
+
+        value = billable * rate
+        gross_total += value
+        line_items.append({"boq_item": code, "basis": basis, "billable_qty": billable,
+                            "rate": rate, "value": value, "notes": notes})
+
+    gst = round(gross_total * GST_RATE, 2)
+    retention = round(gross_total * RETENTION_RATE, 2)
+
+    contract_value_total = sum(
+        (boq[c]["contract_qty"] * boq[c]["rate"]) for c in boq
+        if boq[c].get("contract_qty") is not None and boq[c].get("rate") is not None
+    )
+    total_advance = contract_value_total * ADVANCE_RATE_OF_CONTRACT
+    recovered_so_far = sum(float(b["gross_value_inr"]) * ADVANCE_RECOVERY_RATE_OF_GROSS
+                            for b in prior_bills)
+    outstanding_advance = max(total_advance - recovered_so_far, 0.0)
+    proposed_recovery = round(gross_total * ADVANCE_RECOVERY_RATE_OF_GROSS, 2)
+    advance_recovery = min(proposed_recovery, outstanding_advance)
+
+    net_payable = round(gross_total + gst - retention - advance_recovery, 2)
+
+    return {
+        "work_month": work_month, "line_items": line_items, "gross": gross_total,
+        "gst": gst, "retention": retention, "advance_recovery": advance_recovery,
+        "outstanding_advance_after": round(outstanding_advance - advance_recovery, 2),
+        "net_payable": net_payable,
+    }
+
+
 def run():
     if not API_TOKEN:
         print("Set CLICKUP_API_TOKEN in .env first."); sys.exit(1)
@@ -342,64 +416,13 @@ def run():
     cumulative_before = load_cumulative_billed()
     prior_bills = load_bill_register()
 
-    boq_codes = sorted(boq.keys()) if boq else sorted(KNOWN_BILLING_BASIS.keys())
+    result = compute_bill(boq, mc_data, production_orders, cumulative_before, prior_bills)
+    line_items = result["line_items"]
+    gross_total, gst, retention = result["gross"], result["gst"], result["retention"]
+    advance_recovery, net_payable = result["advance_recovery"], result["net_payable"]
 
-    line_items = []
-    gross_total = 0.0
-
-    for code in boq_codes:
-        entry = boq.get(code, {})
-        rate = entry.get("rate")
-        contract_qty = entry.get("contract_qty")
-        basis = KNOWN_BILLING_BASIS.get(code)
-
-        if rate is None or contract_qty is None:
-            print(f"  ! {code}: Rate or Contract Qty missing/unreadable from ClickUp — skipped, not guessed at.")
-            continue
-
-        cum_before = cumulative_before.get(code, 0.0)
-
-        if basis == "DELIVERY_QC":
-            billable, notes = compute_billable_delivery_qc(code, production_orders, cum_before, contract_qty)
-        elif basis == "PROGRESS":
-            billable, notes = compute_billable_progress(code, mc_data, cum_before, contract_qty)
-        elif basis == "MILESTONE":
-            # A4010/A1010 completion isn't parsed from the schedule here to
-            # keep this program focused on billing math; cumulative_before
-            # already tells us B01 was billed in RA-02. B07's milestone
-            # (commissioning, A4010) is confirmed not yet complete as of
-            # 30 Sep 2026 per the WBS/Schedule import — hardcoded as a
-            # known fact of this specific run, flagged clearly as such.
-            milestone_complete = False if code == "B07" else None
-            billable, notes = compute_milestone(code, cum_before, milestone_complete)
-        else:
-            print(f"  ! {code}: unknown billing basis — skipped."); continue
-
-        value = billable * rate
-        gross_total += value
-        line_items.append({
-            "boq_item": code, "basis": basis, "billable_qty": billable,
-            "rate": rate, "value": value, "notes": notes,
-        })
-
-    gst = round(gross_total * GST_RATE, 2)
-    retention = round(gross_total * RETENTION_RATE, 2)
-
-    # Advance recovery, capped at outstanding balance (§3.1)
-    contract_value_total = sum(
-        (boq[c]["contract_qty"] * boq[c]["rate"]) for c in boq
-        if boq[c].get("contract_qty") is not None and boq[c].get("rate") is not None
-    )
-    total_advance = contract_value_total * ADVANCE_RATE_OF_CONTRACT
-    recovered_so_far = sum(float(b["gross_value_inr"]) * ADVANCE_RECOVERY_RATE_OF_GROSS for b in prior_bills)
-    outstanding_advance = max(total_advance - recovered_so_far, 0.0)
-    proposed_recovery = round(gross_total * ADVANCE_RECOVERY_RATE_OF_GROSS, 2)
-    advance_recovery = min(proposed_recovery, outstanding_advance)
-    if advance_recovery < proposed_recovery:
-        print(f"  ! Advance recovery capped: {proposed_recovery} would exceed outstanding balance "
-              f"of {outstanding_advance} — recovering {advance_recovery} instead.")
-
-    net_payable = round(gross_total + gst - retention - advance_recovery, 2)
+    if advance_recovery < round(gross_total * ADVANCE_RECOVERY_RATE_OF_GROSS, 2):
+        print(f"  ! Advance recovery capped at outstanding balance — recovering Rs.{advance_recovery:,.2f}.")
 
     # --- Print the bill ---
     print(f"\n{'='*60}\nRA-04 — Work month {WORK_MONTH}\n{'='*60}")

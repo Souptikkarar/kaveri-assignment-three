@@ -210,3 +210,47 @@ PR-101, 102 -> L1 | PR-103, 109 -> L2 | PR-104 (leave reroute), 105, 106
 - nothing
 **Tomorrow:**
 - Program 4 (cash-flow forecaster)
+
+## Day 8 — 28.9.26
+
+**What I did:**
+- Built and ran Program 4 (cashflow_forecaster.py) against live ClickUp data
+- Refactored bill_engine.py to expose a shared compute_bill() function, so
+  the forecaster reuses the exact RA-04 formula instead of a second copy
+  that could drift out of sync
+- Read schedule finish dates from WBS/Schedule's native Due Date, which
+  needs no custom field and so wasn't affected by the plan lock
+- Applied the §4.1 timing literally: submitted on the 5th of the next
+  month, paid 30 days after submission
+- Wrote one forecast task per month back into ClickUp [in the RA Bills
+  list / in a new Cash Flow Forecast list - say which]
+
+**Findings:**
+1. RA-03 is submitted but not yet paid (bill_register.csv has a blank
+   paid_on), so its payment is still due around 5 Oct 2026. October's
+   forecast is entirely that payment. A forecaster that treated RA-01 to
+   RA-03 as settled would have shown Rs.0 for October.
+2. The advance is fully recovered exactly at RA-04 (outstanding balance
+   after RA-04 = 0), so the December forecast carries no advance deduction.
+3. B05's contract quantity is exhausted after RA-04, so it contributes
+   nothing further.
+4. B07's commissioning milestone finishes in November, so its payment
+   lands in January 2027, outside the Oct-Dec window. It is excluded and
+   reported as excluded, not silently dropped.
+5. Retention is not counted as an inflow, since §4.2 releases it 12
+   months after commissioning.
+
+**Result (INR):**
+October 24,57,065 | November 40,63,705 | December 17,18,730
+Total Oct-Dec: 82,39,500
+
+**Problem hit:** the first run failed with "module bill_engine has no
+attribute compute_bill". My local bill_engine.py was the old version,
+from before the refactor. I replaced it and re-ran. The live output
+matched my offline dry run to the rupee.
+
+**Blocked on / questions:**
+- nothing
+
+**Tomorrow:**
+- Part C: local Ollama extraction against my hand labels
