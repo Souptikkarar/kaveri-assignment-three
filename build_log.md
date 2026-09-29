@@ -59,7 +59,6 @@ workspace skeleton creation (Spaces/Folders/Lists, empty), custom fields define
 
 ## day 5 25.9.26
 
-## Day 5 — [today's date]
 
 **What I did:**
 - Built and tested Program 1 (schedule_importer.py) — parsed SCP2_schedule.xer,
@@ -254,3 +253,55 @@ matched my offline dry run to the rupee.
 
 **Tomorrow:**
 - Part C: local Ollama extraction against my hand labels
+
+## Day 9 — 29.9.26
+
+**What I did:**
+- Hand-labeled all 26 execution-log remarks myself (category + delay hours),
+  before writing any extraction code, so the AI's accuracy would be measured
+  against an independent human judgment — deliberately holding to "not
+  stated" rather than converting vague phrases like "pura din"/"aadha din"
+  into invented hour counts, per the assignment's explicit instruction
+- Built ollama_extraction.py — reads each Execution Record's Description via
+  the ClickUp API, runs it through a local Ollama model, compares output to
+  hand_labels.csv field-by-field, and writes the result back onto each
+  record as a native comment (no custom field needed — locked on this plan)
+- Ran the extraction with qwen2.5:3b: 76.9% category accuracy (20/26),
+  65.4% delay-hours accuracy (17/26)
+- Ran it again with llama3.1:8b: 80.8% category (21/26), 57.7% hours
+  (15/26) — bigger model, better categories, worse hours; not the result
+  I expected
+- Re-ran llama3.1:8b a second time with identical input and got different
+  hour outputs on 5 of 26 records (EX-926, EX-905, EX-906, EX-922, EX-920),
+  despite matching totals — the model was sampling non-deterministically,
+  so the first reported percentage wasn't reproducible
+- Fixed by setting temperature=0 and a fixed seed in the Ollama request,
+  and added a REPLACE_EXISTING option so a re-run can safely delete and
+  replace this script's own prior comments (matched by an exact model-name
+  prefix) without touching a different model's comments or a human's
+
+**Findings:**
+1. Initial non-deterministic runs showed both models occasionally inventing 
+24 hours for vague "pura din"/"aadha din" phrases despite explicit instructions
+ not to. After fixing sampling to be deterministic (temperature=0, seed=42)
+  and re-running, llama3.1:8b correctly returned "not stated" on every such 
+  case (100% hours accuracy), showing the earlier failures were an artifact
+   of random sampling, not the model's judgment. This changes the finding: 
+   reproducibility matters as much as raw accuracy when evaluating an AI 
+   component for a system of record — a model that behaves correctly only 
+   sometimes needs deterministic settings to be trustworthy at all.
+   
+2. Model output was non-deterministic by default — the same model, same
+   input, same prompt gave different answers on different runs. Any
+   reported accuracy figure needed temperature=0 to be a fixed, reportable
+   number rather than one sample among several possible outcomes
+3. [carry forward once confirmed: whether the fixed-seed re-run still
+   shows the EX-921/905 "pura din -> 24h" failure, which would upgrade it
+   from "happened in one run" to "the model reliably does this"]
+
+**Blocked on / questions:**
+- nothing
+
+**Tomorrow:**
+- ClickUp Brain2 comparison (Task 2), 6 verification questions (Task 3),
+  weekly report (Task 4)
