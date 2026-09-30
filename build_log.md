@@ -305,3 +305,62 @@ matched my offline dry run to the rupee.
 **Tomorrow:**
 - ClickUp Brain2 comparison (Task 2), 6 verification questions (Task 3),
   weekly report (Task 4)
+
+## Day 10 — 30.9.26
+
+**What I did:**
+- Tested ClickUp Brain2 availability — unlike Custom Fields, it works on
+  the Free plan (uses a "Max" model, not locked behind the same paywall)
+- Ran the head-to-head classification: fed Brain2 the same 26 execution-log
+  remarks used for the local-model comparison, scored against
+  hand_labels.csv — 100% on both category and delay-hours (26/26), correctly
+  handling both "pura din" and "aadha din" cases without guessing
+- Ran the 6 verification questions (Task 3): 5/6 correct. The one wrong
+  answer (B04's total logged quantity) revealed a real gap — my Execution
+  Records task Names don't include the BOQ code, so Brain2 had no reliable
+  way to attribute records to B04 and silently summed the wrong BOQ item's
+  five records instead (950m from B05, not B04's actual 8,980m)
+- Wrote the §8.1 data-rule verdict: Brain2 scored higher than either local
+  model, but sends workspace data to ClickUp's own infrastructure with no
+  way to verify processing/retention — ruled out for real contract data
+  regardless of accuracy; only local Ollama models are usable under §8.1
+- Built and tested weekly_report.py (Task 4) — pulls every figure from
+  tasks Programs 2-4 already wrote to ClickUp (RA-04 net payable, Oct/Nov/
+  Dec forecast, PR routing counts from Program 3's own comments, QC
+  failures from Production Orders, schedule status counts), and has a
+  local model write only the connecting narrative
+- First run: numbers were all correct, but the AI narrative added
+  unsupported characterizations ("stable," "significant amount of funds")
+  the data didn't support, and silently dropped October's figure while
+  reporting the other two
+- Fixed by tightening the prompt (explicit ban on unsupported subjective
+  words unless licensed by the facts; every given figure must appear) and
+  adding an automated post-generation check that verifies both rules
+  itself rather than trusting the model's compliance
+- Re-ran: narrative check passed — every figure present, no unsupported
+  language
+
+**Findings:**
+1. Brain2 is available on Free Plan (unlike Custom Fields) but its 100%
+   accuracy isn't directly comparable to the local models' scores, since
+   it likely runs on a materially larger model ("Max") — the win reflects
+   scale as much as platform
+2. Brain2's one wrong answer (B04 quantity) traced to a real gap in my own
+   data design (BOQ code missing from Execution Record task Names), not a
+   Brain2 limitation — worth fixing the naming convention if time allows
+3. An AI can follow a numeric-accuracy constraint perfectly while still
+   producing a misleading report through tone and omission — constraining
+   "don't invent numbers" isn't sufficient on its own; the output still
+   needed an automated compliance check, not just a better prompt
+
+**Part C — final status: complete.**
+Task 1 (local extraction): done, deterministic, two models compared
+Task 2 (Brain2 comparison): done, 100% accuracy, data-rule verdict written
+Task 3 (6 questions): done, 5/6 correct
+Task 4 (weekly report): done, one real AI failure found, fixed, verified
+
+**Blocked on / questions:**
+- nothing 
+
+**Tomorrow:**
+- Part D — the 13 feasibility verdicts (F1-F13)
